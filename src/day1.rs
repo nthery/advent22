@@ -1,7 +1,7 @@
+use std::cmp::max;
 use std::env;
 use std::fs::File;
-use std::io::{BufReader, BufRead};
-use std::cmp::max;
+use std::io::{BufRead, BufReader};
 
 use anyhow::Context;
 
@@ -25,7 +25,7 @@ fn parse_total_food<T: BufRead>(reader: &mut T) -> anyhow::Result<u32> {
     loop {
         let nb_calories = parse_elf_food(reader)?;
         if nb_calories == 0 {
-            break
+            break;
         }
         biggest_meal = max(biggest_meal, nb_calories);
     }
@@ -38,9 +38,9 @@ fn parse_elf_food<T: BufRead>(reader: &mut T) -> anyhow::Result<u32> {
     for line in reader.lines() {
         let line = line?;
         if line.is_empty() {
-            break
+            break;
         }
-        let nb_calories : u32 = line.parse()?;
+        let nb_calories: u32 = line.parse()?;
         total += nb_calories;
     }
 
