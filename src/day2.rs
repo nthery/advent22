@@ -1,36 +1,12 @@
 use std::cmp::{self, Ordering};
-use std::env;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead};
 
-use anyhow::{bail, Context};
+use anyhow::{bail};
 
-// Solving first or second half?
-#[derive(Debug, Clone, Copy)]
-enum Half {
-    First,
-    Second,
-}
+use util::{self, Half, Parser};
 
 fn main() -> anyhow::Result<()> {
-    let args = env::args().collect::<Vec<String>>();
-    if args.len() != 3 {
-        anyhow::bail!("usage: day2 1|2 input_file");
-    }
-
-    let half = match args[1].as_str() {
-        "1" => Half::First,
-        "2" => Half::Second,
-        _ => bail!("bad half"),
-    };
-
-    let file = File::open(&args[2]).context(format!("cannot open {}", args[1]))?;
-    let mut file_reader = BufReader::new(file);
-
-    let score = parse_strategy(&mut file_reader, half)?;
-    println!("Score: {score}");
-
-    Ok(())
+    util::driver(2, DayTwoParser{})
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -98,14 +74,18 @@ impl Round {
     }
 }
 
-fn parse_strategy(reader: &mut impl BufRead, half: Half) -> anyhow::Result<u32> {
-    let mut total_score = 0u32;
-    for maybe_line in reader.lines() {
-        let line = maybe_line?;
-        let round = parse_round(&line, half)?;
-        total_score += round.score();
+struct DayTwoParser;
+
+impl Parser for DayTwoParser {
+    fn parse(&mut self, half: Half, reader: &mut impl BufRead) -> anyhow::Result<u32> {
+        let mut total_score = 0u32;
+        for maybe_line in reader.lines() {
+            let line = maybe_line?;
+            let round = parse_round(&line, half)?;
+            total_score += round.score();
+        }
+        Ok(total_score)
     }
-    Ok(total_score)
 }
 
 fn parse_round(line: &str, half: Half) -> anyhow::Result<Round> {
