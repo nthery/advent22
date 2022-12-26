@@ -5,16 +5,29 @@ use std::io::{BufRead, BufReader};
 
 use anyhow::{bail, Context};
 
+// Solving first or second half?
+#[derive(Debug, Clone, Copy)]
+enum Half {
+    First,
+    Second,
+}
+
 fn main() -> anyhow::Result<()> {
     let args = env::args().collect::<Vec<String>>();
-    if args.len() != 2 {
-        anyhow::bail!("missing input file");
+    if args.len() != 3 {
+        anyhow::bail!("usage: day2 1|2 input_file");
     }
 
-    let file = File::open(&args[1]).context(format!("cannot open {}", args[1]))?;
+    let half = match args[1].as_str() {
+        "1" => Half::First,
+        "2" => Half::Second,
+        _ => bail!("bad half"),
+    };
+
+    let file = File::open(&args[2]).context(format!("cannot open {}", args[1]))?;
     let mut file_reader = BufReader::new(file);
 
-    let score = parse_strategy(&mut file_reader)?;
+    let score = parse_strategy(&mut file_reader, half)?;
     println!("Score: {score}");
 
     Ok(())
@@ -35,6 +48,14 @@ impl Move {
             Move::Scissors => 3,
         }
     }
+}
+
+// Second input field.
+#[derive(Debug)]
+enum CipherMove {
+    X,
+    Y,
+    Z,
 }
 
 impl cmp::PartialOrd for Move {
@@ -77,17 +98,17 @@ impl Round {
     }
 }
 
-fn parse_strategy(reader: &mut impl BufRead) -> anyhow::Result<u32> {
+fn parse_strategy(reader: &mut impl BufRead, half: Half) -> anyhow::Result<u32> {
     let mut total_score = 0u32;
     for maybe_line in reader.lines() {
         let line = maybe_line?;
-        let round = parse_round(&line)?;
+        let round = parse_round(&line, half)?;
         total_score += round.score();
     }
     Ok(total_score)
 }
 
-fn parse_round(line: &str) -> anyhow::Result<Round> {
+fn parse_round(line: &str, half: Half) -> anyhow::Result<Round> {
     let mut words = line.split(' ');
     let opponent_move = match words.next() {
         Some("A") => Move::Rock,
@@ -96,12 +117,12 @@ fn parse_round(line: &str) -> anyhow::Result<Round> {
         Some(m) => bail!(format!("unknown opponent move: {}", m)),
         None => bail!("missing opponent move"),
     };
-    let my_move = match words.next() {
-        Some("X") => Move::Rock,
-        Some("Y") => Move::Paper,
-        Some("Z") => Move::Scissors,
-        Some(m) => bail!(format!("unknown move for me: {}", m)),
-        None => bail!("missing move for me"),
+    let cipher = match words.next() {
+        Some("X") => CipherMove::X,
+        Some("Y") => CipherMove::Y,
+        Some("Z") => CipherMove::Z,
+        Some(m) => bail!(format!("unknown cipher move: {}", m)),
+        None => bail!("missing cipher move"),
     };
     if let Some(x) = words.next() {
         bail!("spurious field: {x}")
@@ -109,6 +130,14 @@ fn parse_round(line: &str) -> anyhow::Result<Round> {
 
     Ok(Round {
         elf: opponent_move,
-        me: my_move,
+        me: decrypt_move(half, cipher),
     })
+}
+
+fn decrypt_move(_half: Half, cipher: CipherMove) -> Move {
+    match cipher {
+        CipherMove::X => Move::Rock,
+        CipherMove::Y => Move::Paper,
+        CipherMove::Z => Move::Scissors,
+    }
 }
