@@ -33,7 +33,7 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum Move {
     Rock,
     Scissors,
@@ -48,14 +48,6 @@ impl Move {
             Move::Scissors => 3,
         }
     }
-}
-
-// Second input field.
-#[derive(Debug)]
-enum CipherMove {
-    X,
-    Y,
-    Z,
 }
 
 impl cmp::PartialOrd for Move {
@@ -79,6 +71,14 @@ impl cmp::Ord for Move {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         self.partial_cmp(other).unwrap()
     }
+}
+
+// Second input field.
+#[derive(Debug)]
+enum CipherMove {
+    X,
+    Y,
+    Z,
 }
 
 struct Round {
@@ -110,7 +110,7 @@ fn parse_strategy(reader: &mut impl BufRead, half: Half) -> anyhow::Result<u32> 
 
 fn parse_round(line: &str, half: Half) -> anyhow::Result<Round> {
     let mut words = line.split(' ');
-    let opponent_move = match words.next() {
+    let elf_move = match words.next() {
         Some("A") => Move::Rock,
         Some("B") => Move::Paper,
         Some("C") => Move::Scissors,
@@ -129,15 +129,30 @@ fn parse_round(line: &str, half: Half) -> anyhow::Result<Round> {
     }
 
     Ok(Round {
-        elf: opponent_move,
-        me: decrypt_move(half, cipher),
+        elf: elf_move,
+        me: decrypt_move(half, elf_move, cipher),
     })
 }
 
-fn decrypt_move(_half: Half, cipher: CipherMove) -> Move {
-    match cipher {
-        CipherMove::X => Move::Rock,
-        CipherMove::Y => Move::Paper,
-        CipherMove::Z => Move::Scissors,
+fn decrypt_move(half: Half, elf_move: Move, cipher: CipherMove) -> Move {
+    match half {
+        Half::First => match cipher {
+            CipherMove::X => Move::Rock,
+            CipherMove::Y => Move::Paper,
+            CipherMove::Z => Move::Scissors,
+        },
+        Half::Second => match cipher {
+            CipherMove::X => match elf_move {
+                Move::Rock => Move::Scissors,
+                Move::Scissors => Move::Paper,
+                Move::Paper => Move::Rock,
+            },
+            CipherMove::Y => elf_move,
+            CipherMove::Z => match elf_move {
+                Move::Rock => Move::Paper,
+                Move::Scissors => Move::Rock,
+                Move::Paper => Move::Scissors,
+            },
+        },
     }
 }
