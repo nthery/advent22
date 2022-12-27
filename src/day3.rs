@@ -1,6 +1,8 @@
 use std::io::BufRead;
+use std::io::Lines;
 
 use anyhow::bail;
+
 use util::{self, Half, Parser};
 
 fn main() -> anyhow::Result<()> {
@@ -11,16 +13,23 @@ struct DayThreeParser;
 
 impl Parser for DayThreeParser {
     fn parse(&mut self, half: Half, reader: &mut impl BufRead) -> anyhow::Result<u32> {
-        let mut total_score = 0u32;
-        for maybe_line in reader.lines() {
-            let line = maybe_line?;
-            total_score += parse_line(&line, half)?;
+        match half {
+            Half::First => solve_first_half(reader),
+            Half::Second => solve_second_half(reader),
         }
-        Ok(total_score)
     }
 }
 
-fn parse_line(line: &str, _half: Half) -> anyhow::Result<u32> {
+fn solve_first_half(reader: &mut impl BufRead) -> anyhow::Result<u32> {
+    let mut total_score = 0u32;
+    for maybe_line in reader.lines() {
+        let line = maybe_line?;
+        total_score += find_duplicated_item(&line)?;
+    }
+    Ok(total_score)
+}
+
+fn find_duplicated_item(line: &str) -> anyhow::Result<u32> {
     if line.len() % 2 != 0 {
         bail!(format!("odd number of characters: {line}"))
     }
@@ -29,14 +38,43 @@ fn parse_line(line: &str, _half: Half) -> anyhow::Result<u32> {
     let rhs = encode(&line[midpoint..])?;
     let dup_index = lhs & rhs;
     if dup_index.count_ones() != 1 {
-        bail!("unexpected number of duplicates at line {line}");
+        bail!(format!("unexpected number of duplicates at line {line}"));
     }
-    Ok(dup_index.trailing_zeros() + 1)
+    Ok(index_to_priority(dup_index))
 }
 
-fn encode(s: &str) -> anyhow::Result<u64> {
+fn solve_second_half(reader: &mut impl BufRead) -> anyhow::Result<u32> {
+    let mut total_score = 0;
+    let mut lines = reader.lines();
+    loop {
+        let line = match lines.next() {
+            Some(maybe_line) => maybe_line,
+            None => break,
+        }?;
+        let mut badge_index = encode(line.as_str())?;
+        badge_index &= next_line(&mut lines)?;
+        badge_index &= next_line(&mut lines)?;
+        if badge_index.count_ones() != 1 {
+            bail!("could not find badge");
+        }
+        total_score += index_to_priority(badge_index);
+    }
+    Ok(total_score)
+}
+
+fn next_line<B: BufRead>(lines: &mut Lines<B>) -> anyhow::Result<u64> {
+    let line = match lines.next() {
+        Some(maybe_line) => maybe_line?,
+        None => bail!("last group is incomplete"),
+    };
+    encode(&line)
+}
+
+// Transform a sequence of items into a bit mask encoding present items as their
+// priority.
+fn encode(items: &str) -> anyhow::Result<u64> {
     let mut mask = 0u64;
-    for c in s.chars() {
+    for c in items.chars() {
         let bit_index = match c {
             'a'..='z' => c as u32 - 'a' as u32,
             'A'..='Z' => c as u32 - 'A' as u32 + 26,
@@ -45,6 +83,10 @@ fn encode(s: &str) -> anyhow::Result<u64> {
         mask |= 1 << bit_index;
     }
     Ok(mask)
+}
+
+fn index_to_priority(index: u64) -> u32 {
+    index.trailing_zeros() + 1
 }
 
 #[cfg(test)]
@@ -65,8 +107,15 @@ mod tests {
 
     #[test]
     fn test_parse_line() -> anyhow::Result<()> {
-        assert_eq!(parse_line("aa", Half::First)?, 1);
-        assert_eq!(parse_line("AA", Half::First)?, 27);
+        assert_eq!(find_duplicated_item("aa")?, 1);
+        assert_eq!(find_duplicated_item("AA")?, 27);
         Ok(())
+    }
+
+    #[test]
+    fn test_index_to_priority() {
+        assert_eq!(index_to_priority(1), 1);
+        assert_eq!(index_to_priority(2), 2);
+        assert_eq!(index_to_priority(4), 3);
     }
 }
